@@ -28,6 +28,13 @@ void Exposer::RegisterCollectable(const std::weak_ptr<Collectable>& collectable,
   endpoint.RegisterCollectable(collectable);
 }
 
+void Exposer::RegisterObservable(
+    std::vector<std::function<std::string()>> observables,
+    const std::string& uri) {
+  auto& endpoint = GetEndpointForUri(uri);
+  endpoint.RegisterObservables(observables);
+}
+
 void Exposer::RegisterAuth(
     std::function<bool(const std::string&, const std::string&)> authCB,
     const std::string& realm, const std::string& uri) {

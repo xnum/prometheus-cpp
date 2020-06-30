@@ -1,6 +1,7 @@
 #include "handler.h"
 
 #include <cstring>
+#include <sstream>
 
 #include "prometheus/counter.h"
 #include "prometheus/summary.h"
@@ -18,8 +19,10 @@ namespace detail {
 
 MetricsHandler::MetricsHandler(
     const std::vector<std::weak_ptr<Collectable>>& collectables,
+    const std::vector<std::function<std::string()>>& observables,
     Registry& registry)
     : collectables_(collectables),
+      observables_(observables),
       bytes_transferred_family_(
           BuildCounter()
               .Name("exposer_transferred_bytes_total")
@@ -117,6 +120,15 @@ static std::size_t WriteResponse(struct mg_connection* conn,
 }
 
 bool MetricsHandler::handleGet(CivetServer*, struct mg_connection* conn) {
+  if (!observables_.empty()) {
+    std::stringstream ss;
+    for (const auto& ob : observables_) {
+      ss << ob() << "\n";
+    }
+    WriteResponse(conn, ss.str());
+    return true;
+  }
+
   auto start_time_of_request = std::chrono::steady_clock::now();
 
   auto metrics = CollectMetrics(collectables_);

@@ -21,6 +21,8 @@ class Endpoint {
   ~Endpoint();
 
   void RegisterCollectable(const std::weak_ptr<Collectable>& collectable);
+  void RegisterObservables(
+      std::vector<std::function<std::string()>> observables);
   void RegisterAuth(
       std::function<bool(const std::string&, const std::string&)> authCB,
       const std::string& realm);
@@ -31,6 +33,7 @@ class Endpoint {
   CivetServer& server_;
   const std::string uri_;
   std::vector<std::weak_ptr<Collectable>> collectables_;
+  std::vector<std::function<std::string()>> observables_;
   // registry for "meta" metrics about the endpoint itself
   std::shared_ptr<Registry> endpoint_registry_;
   std::unique_ptr<MetricsHandler> metrics_handler_;

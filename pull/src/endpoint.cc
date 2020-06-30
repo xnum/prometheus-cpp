@@ -12,7 +12,7 @@ Endpoint::Endpoint(CivetServer& server, std::string uri)
       uri_(std::move(uri)),
       endpoint_registry_(std::make_shared<Registry>()),
       metrics_handler_(detail::make_unique<MetricsHandler>(
-          collectables_, *endpoint_registry_)) {
+          collectables_, observables_, *endpoint_registry_)) {
   RegisterCollectable(endpoint_registry_);
   server_.addHandler(uri_, metrics_handler_.get());
 }
@@ -25,6 +25,11 @@ Endpoint::~Endpoint() {
 void Endpoint::RegisterCollectable(
     const std::weak_ptr<Collectable>& collectable) {
   collectables_.push_back(collectable);
+}
+
+void Endpoint::RegisterObservables(
+    std::vector<std::function<std::string()>> observables) {
+  observables_ = observables;
 }
 
 void Endpoint::RegisterAuth(

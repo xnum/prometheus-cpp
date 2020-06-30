@@ -28,6 +28,8 @@ class PROMETHEUS_CPP_PULL_EXPORT Exposer {
   ~Exposer();
   void RegisterCollectable(const std::weak_ptr<Collectable>& collectable,
                            const std::string& uri = std::string("/metrics"));
+  void RegisterObservable(std::vector<std::function<std::string()>> observables,
+                          const std::string& uri = std::string("/vars"));
 
   void RegisterAuth(
       std::function<bool(const std::string&, const std::string&)> authCB,
