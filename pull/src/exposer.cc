@@ -18,45 +18,49 @@ Exposer::Exposer(const std::string& bind_address, const std::size_t num_threads)
                                        std::to_string(num_threads)}) {}
 
 Exposer::Exposer(std::vector<std::string> options)
-    : server_(detail::make_unique<CivetServer>(std::move(options))) {}
+    : server_(detail::make_unique<CivetServer>(std::move(options))),
+      endpoint_registry_(std::make_shared<Registry>()) {
+  collectables_.push_back(endpoint_registry_);
+
+  metricsHandler_ = detail::make_unique<detail::MetricsHandler>(
+      collectables_, *endpoint_registry_);
+  metricsEndpoint_ = detail::make_unique<detail::Endpoint>(
+      *server_, "/metrics", metricsHandler_.get());
+
+  varsHandler_ = detail::make_unique<detail::DumpHandler>(observables_);
+  varsEndpoint_ = detail::make_unique<detail::Endpoint>(*server_, "/vars",
+                                                        varsHandler_.get());
+
+  aliveHandler_ = detail::make_unique<detail::ProbeHandler>(aliveProbe_);
+  aliveEndpoint_ = detail::make_unique<detail::Endpoint>(*server_, "/alive",
+                                                         aliveHandler_.get());
+
+  readyHandler_ = detail::make_unique<detail::ProbeHandler>(readyProbe_);
+  readyEndpoint_ = detail::make_unique<detail::Endpoint>(*server_, "/ready",
+                                                         readyHandler_.get());
+}
 
 Exposer::~Exposer() = default;
 
-void Exposer::RegisterCollectable(const std::weak_ptr<Collectable>& collectable,
-                                  const std::string& uri) {
-  auto& endpoint = GetEndpointForUri(uri);
-  endpoint.RegisterCollectable(collectable);
+void Exposer::RegisterCollectable(
+    const std::weak_ptr<Collectable>& collectable) {
+  collectables_.push_back(collectable);
 }
 
-void Exposer::RegisterObservable(
-    std::vector<std::function<std::string()>> observables,
-    const std::string& uri) {
-  auto& endpoint = GetEndpointForUri(uri);
-  endpoint.RegisterObservables(observables);
+void Exposer::RegisterObservable(std::function<std::string()> observables) {
+  observables_.push_back(observables);
 }
 
-void Exposer::RegisterAuth(
-    std::function<bool(const std::string&, const std::string&)> authCB,
-    const std::string& realm, const std::string& uri) {
-  auto& endpoint = GetEndpointForUri(uri);
-  endpoint.RegisterAuth(std::move(authCB), realm);
+void Exposer::RegisterAliveness(std::function<bool()> aliveProbe) {
+  aliveProbe_ = aliveProbe;
+}
+
+void Exposer::RegisterReadiness(std::function<bool()> readyProbe) {
+  readyProbe_ = readyProbe;
 }
 
 std::vector<int> Exposer::GetListeningPorts() const {
   return server_->getListeningPorts();
-}
-
-detail::Endpoint& Exposer::GetEndpointForUri(const std::string& uri) {
-  auto sameUri = [uri](const std::unique_ptr<detail::Endpoint>& endpoint) {
-    return endpoint->GetURI() == uri;
-  };
-  auto it = std::find_if(std::begin(endpoints_), std::end(endpoints_), sameUri);
-  if (it != std::end(endpoints_)) {
-    return *it->get();
-  }
-
-  endpoints_.emplace_back(detail::make_unique<detail::Endpoint>(*server_, uri));
-  return *endpoints_.back().get();
 }
 
 }  // namespace prometheus

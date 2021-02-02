@@ -19,10 +19,8 @@ namespace detail {
 
 MetricsHandler::MetricsHandler(
     const std::vector<std::weak_ptr<Collectable>>& collectables,
-    const std::vector<std::function<std::string()>>& observables,
     Registry& registry)
     : collectables_(collectables),
-      observables_(observables),
       bytes_transferred_family_(
           BuildCounter()
               .Name("exposer_transferred_bytes_total")
@@ -120,15 +118,6 @@ static std::size_t WriteResponse(struct mg_connection* conn,
 }
 
 bool MetricsHandler::handleGet(CivetServer*, struct mg_connection* conn) {
-  if (!observables_.empty()) {
-    std::stringstream ss;
-    for (const auto& ob : observables_) {
-      ss << ob() << "\n";
-    }
-    WriteResponse(conn, ss.str());
-    return true;
-  }
-
   auto start_time_of_request = std::chrono::steady_clock::now();
 
   auto metrics = CollectMetrics(collectables_);
@@ -146,5 +135,44 @@ bool MetricsHandler::handleGet(CivetServer*, struct mg_connection* conn) {
   num_scrapes_.Increment();
   return true;
 }
+
+DumpHandler::DumpHandler(
+    const std::vector<std::function<std::string()>>& observables)
+    : observables_(observables) {}
+
+bool DumpHandler::handleGet(CivetServer*, struct mg_connection* conn) {
+  std::stringstream ss;
+
+  for (const auto& ob : observables_) {
+    ss << ob() << "\n";
+  }
+
+  WriteResponse(conn, ss.str());
+
+  return true;
+}
+
+ProbeHandler::ProbeHandler(const std::function<bool()>& probe)
+    : probe_(probe) {}
+
+bool ProbeHandler::handleGet(CivetServer* server, struct mg_connection* conn) {
+  if (probe_()) {
+    mg_printf(conn,
+              "HTTP/1.1 200 OK\r\n"
+              "Content-Length: 0\r\n"
+              "Content-Type: text/plain\r\n"
+              "Connection: close\r\n\r\n");
+  } else {
+    mg_printf(conn,
+              "HTTP/1.1 500 Internal Server Error\r\n"
+              "Content-Length: 0\r\n"
+              "Content-Type: text/plain\r\n"
+              "Connection: close\r\n\r\n");
+  }
+
+  return true;
+}
+
 }  // namespace detail
 }  // namespace prometheus
+

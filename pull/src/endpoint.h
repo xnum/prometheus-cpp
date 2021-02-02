@@ -10,6 +10,7 @@
 #include "prometheus/registry.h"
 
 class CivetServer;
+class CivetHandler;
 
 namespace prometheus {
 namespace detail {
@@ -17,27 +18,16 @@ class MetricsHandler;
 
 class Endpoint {
  public:
-  explicit Endpoint(CivetServer& server, std::string uri);
+  explicit Endpoint(CivetServer& server, std::string uri,
+                    CivetHandler* handler);
   ~Endpoint();
-
-  void RegisterCollectable(const std::weak_ptr<Collectable>& collectable);
-  void RegisterObservables(
-      std::vector<std::function<std::string()>> observables);
-  void RegisterAuth(
-      std::function<bool(const std::string&, const std::string&)> authCB,
-      const std::string& realm);
 
   const std::string& GetURI() const;
 
  private:
   CivetServer& server_;
   const std::string uri_;
-  std::vector<std::weak_ptr<Collectable>> collectables_;
-  std::vector<std::function<std::string()>> observables_;
-  // registry for "meta" metrics about the endpoint itself
-  std::shared_ptr<Registry> endpoint_registry_;
-  std::unique_ptr<MetricsHandler> metrics_handler_;
-  std::unique_ptr<BasicAuthHandler> auth_handler_;
+  CivetHandler* handler_;
 };
 
 }  // namespace detail
